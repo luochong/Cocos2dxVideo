@@ -26,14 +26,13 @@ class CCVideoPic : public CCObject
 {
 	public:
 		CCVideoPic();
-		bool init(const char *path, int frame, int streamidx, AVCodecContext * pCodecCtx, SwsContext *pSwsCtx, AVFrame *pFrame);
+		bool init(const char *path, int frame,unsigned int width,  unsigned int height, unsigned char* data);
 		virtual ~CCVideoPic();
 		const char *m_path;
 		int m_frame;
-		int m_videoStream;
 		int m_width;
 		int m_height;
-		AVPicture* m_pPicture;
+		unsigned char* m_pPicture;
 };
 
  

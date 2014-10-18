@@ -62,8 +62,10 @@ bool CCVideoLayer::init(const char* path)
     m_frameRate = pVideoDecode->getFrameRate();             // 帧率
 
 
-    AVPicture *picture = new AVPicture;  
-    avpicture_alloc(picture, PIX_FMT_RGBA, m_width, m_height); 
+    //AVPicture *picture = new AVPicture;  
+    //avpicture_alloc(picture, PIX_FMT_RGBA, m_width, m_height);
+
+
 
     // 渲染的纹理  
     CCTexture2D *texture = new CCTexture2D();
@@ -84,19 +86,27 @@ bool CCVideoLayer::init(const char* path)
         ((((*inPixel32 >> 24) & 0xFF) >> 4) << 0);  // A
     }
 */
-    texture->initWithData(picture->data[0], kCCTexture2DPixelFormat_RGBA8888, m_width, m_height, CCSize(m_width, m_height));  
+
+    unsigned int length = m_width * m_height * 4;
+    unsigned char* tempData = new unsigned char[length];
+    for(unsigned int i = 0; i < length; ++i)
+    {
+        tempData[i] = 0;
+    }
+
+    texture->initWithData(tempData, kCCTexture2DPixelFormat_RGBA8888, m_width, m_height, CCSize(m_width, m_height));  
     
     initWithTexture(texture);
 
     this->setContentSize(CCSize(m_width, m_height));
 
-    //delete [] tempData;
+    delete [] tempData;
 
-    if(picture)
+    /*if(picture)
     {
         avpicture_free(picture);  
         delete picture; 
-    }
+    }*/
 
     return true;  
 }
@@ -105,6 +115,7 @@ bool CCVideoLayer::init(const char* path)
   
 void CCVideoLayer::playVideo()  
 {  
+    update(0);
     this->schedule(schedule_selector(CCVideoLayer::update), m_frameRate);
 }  
   
@@ -118,6 +129,7 @@ void CCVideoLayer::stopVideo(void)
 void CCVideoLayer::seek(int frame)  
 {  
     m_frame_count = frame;
+    update(0);
 }  
   
 void CCVideoLayer::update(float dt)  

@@ -157,7 +157,7 @@ void CCVideoTextureCache::picToTexture()
                 }
                 */
                 addImageWidthData(pVideoPic->m_path, pVideoPic->m_frame, 
-                    pVideoPic->m_pPicture->data[pVideoPic->m_videoStream], 
+                    pVideoPic->m_pPicture, 
                     kCCTexture2DPixelFormat_RGBA8888, 
                     pVideoPic->m_width, pVideoPic->m_height, 
                     CCSize(pVideoPic->m_width, pVideoPic->m_height)

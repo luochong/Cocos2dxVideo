@@ -14,24 +14,23 @@ CCVideoPic::~CCVideoPic()
 {  
     if(m_pPicture)
     {
-        avpicture_free(m_pPicture);  
         delete m_pPicture; 
     }
 }
 
-bool CCVideoPic::init(const char *path, int frame, int videoStream, AVCodecContext * pCodecCtx, SwsContext *pSwsCtx, AVFrame *pFrame)
+bool CCVideoPic::init(const char *path, int frame,unsigned int width,  unsigned int height, unsigned char* data)
 {
-    m_pPicture = new AVPicture; 
-    avpicture_alloc(m_pPicture, PIX_FMT_RGBA, pCodecCtx->width, pCodecCtx->height);
-
-    sws_scale (pSwsCtx, pFrame->data, pFrame->linesize,  
-               0, pCodecCtx->height,  
-               m_pPicture->data, m_pPicture->linesize); 
-    m_path = path;
+    //unsigned char* data = pic.data[m_videoStream];
+    m_width = width;
+    m_height = height;
     m_frame = frame;
-    m_videoStream = videoStream;
-    m_width = pCodecCtx->width;
-    m_height = pCodecCtx->height;
+    m_path = path;
+    unsigned int length = m_width * m_height * 4;
+    m_pPicture = new unsigned char[length];
+    for(unsigned int i = 0; i < length; ++i)
+    {
+        m_pPicture[i] = data[i];
+    }
     return true;
 }
 
@@ -62,9 +61,7 @@ bool CCVideoDecode::init(const char *path)
     if(avformat_find_stream_info(m_pFormatCtx, NULL) < 0) {  
         CCLOG("avformat_find_stream_info false");
         return false;  
-    }  
-    
-    CCLOG("avg_frame_rate =  %d / %d", m_pFormatCtx->streams[0]->avg_frame_rate.num, m_pFormatCtx->streams[0]->avg_frame_rate.den);
+    } 
 
     m_videoStream = -1;
    
@@ -118,8 +115,6 @@ bool CCVideoDecode::init(const char *path)
         CCLOGERROR("duration is null");
         return false;
     }
-
-    CCLOG("avg_frame_rate =  %d / %d", m_pFormatCtx->streams[m_videoStream]->avg_frame_rate.num, m_pFormatCtx->streams[m_videoStream]->avg_frame_rate.den);
     
     AVRational rational;
 
@@ -157,7 +152,7 @@ bool CCVideoDecode::init(const char *path)
         return false;
     }  
 
-    m_pFrame=avcodec_alloc_frame();
+   /* m_pFrame=avcodec_alloc_frame();
     CCLOG("width: %d, hight: %d", m_pCodecCtx->width, m_pCodecCtx->height);
     m_pSwsCtx = sws_getContext(m_pCodecCtx->width,  
                                      m_pCodecCtx->height,  
@@ -170,7 +165,7 @@ bool CCVideoDecode::init(const char *path)
     {
         CCLOGERROR("sws_getContext error");
         return false;
-    }
+    }*/
     return true;
 }
 
@@ -202,11 +197,11 @@ const char* CCVideoDecode::getFilePath()
 CCVideoDecode::~CCVideoDecode()
 {
     CCLOGINFO("cocos2d: deallocing CCVideoDecode.");
-    if(m_pSwsCtx) sws_freeContext(m_pSwsCtx); 
+    //if(m_pSwsCtx) sws_freeContext(m_pSwsCtx); 
     
 
     // Free the YUV frame 
-    if(m_pFrame) av_free(m_pFrame);  
+    //if(m_pFrame) av_free(m_pFrame);  
     
     // Close the codec  
     if (m_pCodecCtx) avcodec_close(m_pCodecCtx);  
@@ -223,31 +218,62 @@ bool CCVideoDecode::decode()
     if(m_frameCount == -1)
         return false;
 
-	AVPacket packet;
-	int frameFinished = 0;
-    while(!frameFinished && av_read_frame(m_pFormatCtx, &packet)>=0) {  
-        // Is this a packet from the video stream?  
-        if(packet.stream_index== m_videoStream) {  
-            // Decode video frame  
-            avcodec_decode_video2(m_pCodecCtx, m_pFrame, &frameFinished, &packet);  
-        }  
-          
-        // Free the packet that was allocated by av_read_frame  
-        av_free_packet(&packet);  
+    AVPacket packet;
+    int frameFinished = 0;
+    m_pFrame = NULL;
+    while(!frameFinished && av_read_frame(m_pFormatCtx, &packet)>=0)
+    { 
+        if(packet.stream_index== m_videoStream)
+        {
+            m_pFrame = avcodec_alloc_frame();
+            int lentmp = avcodec_decode_video2(m_pCodecCtx, m_pFrame, &frameFinished, &packet);
+            if(lentmp <=0)
+            {
+                av_free(m_pFrame);
+                return false;
+            }
+        }
+        av_free_packet(&packet);
     }
 
-    m_frameCount++;
+    if(m_pFrame == NULL)
+    {
+        return false;
+    }
     
-    CCVideoPic *pVideoPic = new CCVideoPic();
-    pVideoPic->init(m_filepath, m_frameCount,m_videoStream, m_pCodecCtx, m_pSwsCtx, m_pFrame);
+    m_pSwsCtx = sws_getContext(m_pCodecCtx->width,
+        m_pCodecCtx->height,
+        m_pCodecCtx->pix_fmt,
+        m_width,
+        m_height, PIX_FMT_RGBA, SWS_FAST_BILINEAR, NULL, NULL, NULL);
+    if(!m_pSwsCtx)
+    {
+        CCLOGERROR("sws_getContext error");
+        return false;
+    }
 
+    AVPicture pic;
+    avpicture_alloc(&pic, PIX_FMT_RGBA, m_width, m_height);
+    CCLOG("avpicture_alloc width = %d height = %d m_videoStream = %d", m_width, m_height, m_videoStream);
+    sws_scale(m_pSwsCtx, m_pFrame->data, m_pFrame->linesize, 0, m_height, pic.data, pic.linesize);
+    
+    m_frameCount++;
+
+    CCVideoPic *pVideoPic = new CCVideoPic();
+    pVideoPic->init(m_filepath, m_frameCount, m_width, m_height, pic.data[m_videoStream]);
     CCVideoTextureCache::sharedTextureCache()->addPicData(pVideoPic);
-   	
-   	if (frameFinished == 0) {
-   		//重头开始解码
-   		//av_seek_frame(m_pFormatCtx, m_videoStream , 0, AVSEEK_FLAG_ANY);
-   		m_frameCount = -1;
-   	}
+    
+
+    avpicture_free(&pic);
+    av_free(m_pFrame);
+
+    if (frameFinished == 0)
+    {
+        //重头开始解码
+        //av_seek_frame(m_pFormatCtx, m_videoStream , 0, AVSEEK_FLAG_ANY);
+        m_frameCount = -1;
+    }
+    av_free_packet(&packet);
     return true;
 }
 
