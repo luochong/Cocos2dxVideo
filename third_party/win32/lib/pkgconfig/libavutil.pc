@@ -1,0 +1,14 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 56.31.100
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -libpath:/c/projects/avbuild/tools/VS2013x86/lib/pkgconfig/../../lib mfx.lib AdvAPI32.lib user32.lib bcrypt.lib
+Cflags: -I${includedir}
